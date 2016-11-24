@@ -86,7 +86,10 @@ namespace NeoSmart.SpeedySerializer
                 {
                     var serializer = Newtonsoft.Json.JsonSerializer.Create();
                     serializer.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
-                    serializer.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    if (CompressionLevel == CompressionLevel.None)
+                    {
+                        serializer.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    }
                     serializer.ContractResolver = new PrivateSetterResolver();
                     serializer.Serialize(writer, o);
                 }
