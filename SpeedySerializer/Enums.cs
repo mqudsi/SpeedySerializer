@@ -11,6 +11,14 @@ namespace NeoSmart.SpeedySerializer
         None,
         Fastest,
         Balanced,
-        Smallest
+        Smallest,
+    }
+
+    public enum SerializationMethod
+    {
+        NetJson,
+        NewtonSoft,
+        BinaryFormatter,
+        Jil,
     }
 }
