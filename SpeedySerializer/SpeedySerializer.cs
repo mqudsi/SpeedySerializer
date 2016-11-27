@@ -10,9 +10,7 @@ namespace NeoSmart.SpeedySerializer
 {
     public static class SpeedySerializer
     {
-        public static SerializationMethod Backend = SerializationMethod.NewtonSoft;
-        public static string BaseDirectory = "";
-        public static CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Fastest;
+        public static readonly SerializationOptions Defaults = new SerializationOptions();
         private static Stream CompressionStream(CompressionLevel level, Stream stream)
         {
             switch (level)
@@ -50,7 +48,7 @@ namespace NeoSmart.SpeedySerializer
             }
         }
 
-        private static string FileName(string naymspace, string key)
+        private static string FileName(string baseDirectory, string naymspace, string key)
         {
             var namespaceBytes = Encoding.UTF8.GetBytes(naymspace);
             var namespaceHash = MetroHash128.Hash(0, namespaceBytes, 0, namespaceBytes.Length);
@@ -61,94 +59,96 @@ namespace NeoSmart.SpeedySerializer
             var base64 = Convert.ToBase64String(keyHash);
             base64 = base64.TrimEnd('=') + ".ss";
 
-            if (!string.IsNullOrWhiteSpace(BaseDirectory))
+            if (!string.IsNullOrWhiteSpace(baseDirectory))
             {
-                return Path.Combine(BaseDirectory, base64);
+                return Path.Combine(baseDirectory, base64);
             }
             return base64;
         }
 
-        public static void Serialize<T>(string naymspace, string key, T o)
+        public static void Serialize<T>(string naymspace, string key, T o, SerializationOptions options = null)
         {
-            using (var stream = File.Open(FileName(naymspace, key), FileMode.Create, FileAccess.ReadWrite, FileShare.None))
-            using (var cstream = CompressionStream(CompressionLevel, stream))
+            if (options == null)
+            {
+                options = Defaults;
+            }
+
+            using (var stream = File.Open(FileName(options.BaseDirectory, naymspace, key), FileMode.Create, FileAccess.ReadWrite, FileShare.None))
+            using (var cstream = CompressionStream(options.CompressionLevel, stream))
             using (var writer = new StreamWriter(cstream, Encoding.UTF8, 4096, true))
             {
-                if (Backend == SerializationMethod.NetJson)
+                switch (options.Engine)
                 {
-                    NetJSON.NetJSON.Serialize(o, writer);
-                }
-                else if (Backend == SerializationMethod.Jil)
-                {
-                    Jil.JSON.Serialize(o, writer);
-                }
-                else if (Backend == SerializationMethod.NewtonSoft)
-                {
-                    var serializer = Newtonsoft.Json.JsonSerializer.Create();
-                    serializer.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
-                    if (CompressionLevel == CompressionLevel.None)
-                    {
-                        serializer.Formatting = Newtonsoft.Json.Formatting.Indented;
-                    }
-                    serializer.ContractResolver = new PrivateSetterResolver();
-                    serializer.Serialize(writer, o);
-                }
-                else
-                {
-                    throw new NotImplementedException();
+                    case SerializationMethod.NetJson:
+                        NetJSON.NetJSON.Serialize(o, writer);
+                        break;
+                    case SerializationMethod.Jil:
+                        Jil.JSON.Serialize(o, writer);
+                        break;
+                    case SerializationMethod.NewtonSoft:
+                        var serializer = Newtonsoft.Json.JsonSerializer.Create();
+                        serializer.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
+                        if (options.CompressionLevel == CompressionLevel.None)
+                        {
+                            serializer.Formatting = Newtonsoft.Json.Formatting.Indented;
+                        }
+                        serializer.ContractResolver = new PrivateSetterResolver();
+                        serializer.Serialize(writer, o);
+                        break;
+                    default:
+                        throw new NotImplementedException();
                 }
             }
         }
 
-        public static void Serialize<T>(string key, T o)
+        public static void Serialize<T>(string key, T o, SerializationOptions options = null)
         {
-            Serialize(String.Empty, key, o);
+            Serialize(string.Empty, key, o, options);
         }
 
-        public static T Deserialize<T>(string key)
+        public static T Deserialize<T>(string key, SerializationOptions options = null)
         {
-            return Deserialize<T>(String.Empty, key);
+            return Deserialize<T>(string.Empty, key, options);
         }
 
-        public static T Deserialize<T>(string naymspace, string key)
+        public static T Deserialize<T>(string naymspace, string key, SerializationOptions options = null)
         {
-            var filename = FileName(naymspace, key);
+            options = options ?? Defaults;
+
+            var filename = FileName(options.BaseDirectory, naymspace, key);
             using (var stream = File.OpenRead(filename))
-            using (var cstream = DecompressionStream(CompressionLevel, stream))
+            using (var cstream = DecompressionStream(options.CompressionLevel, stream))
             using (var reader = new StreamReader(cstream, Encoding.UTF8, false, 4096, true))
             {
-                if (Backend == SerializationMethod.NetJson)
+                switch (options.Engine)
                 {
-                    return NetJSON.NetJSON.Deserialize<T>(reader);
-                }
-                else if (Backend == SerializationMethod.Jil)
-                {
-                    return Jil.JSON.Deserialize<T>(reader);
-                }
-                else if (Backend == SerializationMethod.NewtonSoft)
-                {
-                    using (var jReader = new Newtonsoft.Json.JsonTextReader(reader))
-                    {
-                        jReader.CloseInput = false;
-                        var deserializer = Newtonsoft.Json.JsonSerializer.Create();
-                        deserializer.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
-                        deserializer.ContractResolver = new PrivateSetterResolver();
-                        var deserialized = deserializer.Deserialize<T>(jReader);
-                        return deserialized;
-                    }
-                }
-                else
-                {
-                    throw new NotImplementedException();
+                    case SerializationMethod.NetJson:
+                        return NetJSON.NetJSON.Deserialize<T>(reader);
+                    case SerializationMethod.Jil:
+                        return Jil.JSON.Deserialize<T>(reader);
+                    case SerializationMethod.NewtonSoft:
+                        using (var jReader = new Newtonsoft.Json.JsonTextReader(reader))
+                        {
+                            jReader.CloseInput = false;
+                            var deserializer = Newtonsoft.Json.JsonSerializer.Create();
+                            deserializer.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
+                            deserializer.ContractResolver = new PrivateSetterResolver();
+                            var deserialized = deserializer.Deserialize<T>(jReader);
+                            return deserialized;
+                        }
+                    default:
+                        throw new NotImplementedException();
                 }
             }
         }
 
-        public static bool TryDeserialize<T>(string naymspace, string key, ref T o)
+        public static bool TryDeserialize<T>(string naymspace, string key, ref T o, SerializationOptions options = null)
         {
+            options = options ?? Defaults;
+
             try
             {
-                o = Deserialize<T>(naymspace, key);
+                o = Deserialize<T>(naymspace, key, options);
                 return true;
             }
             catch (FileNotFoundException)
@@ -158,19 +158,19 @@ namespace NeoSmart.SpeedySerializer
             catch (Exception ex)
             {
                 //delete the file because it seems to be corrupted, maybe?
-                var filename = FileName(naymspace, key);
+                var filename = FileName(options.BaseDirectory, naymspace, key);
                 if (File.Exists(filename))
                 {
                     File.Delete(filename);
                 }
-                throw;
+                throw ex;
                 return false;
             }
         }
 
-        public static bool TryDeserialize<T>(string key, ref T o)
+        public static bool TryDeserialize<T>(string key, ref T o, SerializationOptions options = null)
         {
-            return TryDeserialize(String.Empty, key, ref o);
+            return TryDeserialize(string.Empty, key, ref o, options);
         }
     }
 }
