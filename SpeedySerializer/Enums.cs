@@ -18,6 +18,7 @@ namespace NeoSmart.SpeedySerializer
     {
         NetJson,
         NewtonSoft,
+        Bson,
         BinaryFormatter,
         Jil,
     }

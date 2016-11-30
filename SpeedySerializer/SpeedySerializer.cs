@@ -85,15 +85,19 @@ namespace NeoSmart.SpeedySerializer
                     case SerializationMethod.Jil:
                         Jil.JSON.Serialize(o, writer);
                         break;
+                    case SerializationMethod.Bson:
                     case SerializationMethod.NewtonSoft:
                         var serializer = Newtonsoft.Json.JsonSerializer.Create();
+                        var jWriter = options.Engine == SerializationMethod.Bson
+                            ? new Newtonsoft.Json.Bson.BsonWriter(cstream)
+                            : (Newtonsoft.Json.JsonWriter) new Newtonsoft.Json.JsonTextWriter(writer);
                         serializer.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
                         if (options.CompressionLevel == CompressionLevel.None)
                         {
                             serializer.Formatting = Newtonsoft.Json.Formatting.Indented;
                         }
                         serializer.ContractResolver = new PrivateSetterResolver();
-                        serializer.Serialize(writer, o);
+                        serializer.Serialize(jWriter, o);
                         break;
                     default:
                         throw new NotImplementedException();
@@ -127,7 +131,9 @@ namespace NeoSmart.SpeedySerializer
                     case SerializationMethod.Jil:
                         return Jil.JSON.Deserialize<T>(reader);
                     case SerializationMethod.NewtonSoft:
-                        using (var jReader = new Newtonsoft.Json.JsonTextReader(reader))
+                        using (var jReader = options.Engine == SerializationMethod.Bson ? 
+                            new Newtonsoft.Json.Bson.BsonReader(cstream) : 
+                            (Newtonsoft.Json.JsonReader) new Newtonsoft.Json.JsonTextReader(reader))
                         {
                             jReader.CloseInput = false;
                             var deserializer = Newtonsoft.Json.JsonSerializer.Create();
