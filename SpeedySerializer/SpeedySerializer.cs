@@ -178,5 +178,21 @@ namespace NeoSmart.SpeedySerializer
         {
             return TryDeserialize(string.Empty, key, ref o, options);
         }
+
+        public static bool Backup(string naymspace, string key, SerializationOptions options = null)
+        {
+            var filename = FileName(options?.BaseDirectory ?? Defaults.BaseDirectory, naymspace, key);
+            if (File.Exists(filename))
+            {
+                File.Copy(filename, $"{filename}.bak", true);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool Backup(string key, SerializationOptions options = null)
+        {
+            return Backup(string.Empty, key, options);
+        }
     }
 }
