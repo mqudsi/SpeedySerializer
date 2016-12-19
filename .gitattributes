@@ -19,3 +19,5 @@
 *.vcxitems   text eol=crlf
 
 *.cs         diff=csharp
+*.resx       text merge=union eol=crlf
+
